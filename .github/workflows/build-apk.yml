@@ -28,6 +28,32 @@ jobs:
           mkdir -p www
           if [ -f index.html ]; then cp index.html www/index.html; else cp shop-guard.html www/index.html; fi
 
+      - name: Bundle object detection model (works offline)
+        run: |
+          mkdir -p www/lib www/model
+          curl -fsSL --retry 3 -o www/lib/tf.min.js https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js || rm -f www/lib/tf.min.js
+          curl -fsSL --retry 3 -o www/lib/coco-ssd.min.js https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js || rm -f www/lib/coco-ssd.min.js
+          python3 - <<'PY'
+          import json, os, subprocess
+          base = 'https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2'
+          def get(name):
+              r = subprocess.run(['curl', '-fsSL', '--retry', '3', '-o', 'www/model/' + name, base + '/' + name])
+              return r.returncode == 0
+          if get('model.json'):
+              m = json.load(open('www/model/model.json'))
+              ok = True
+              for grp in m.get('weightsManifest', []):
+                  for p in grp['paths']:
+                      ok = get(p) and ok
+              if not ok:
+                  print('some model files failed; the app will download the model online instead')
+                  for f in os.listdir('www/model'):
+                      os.remove('www/model/' + f)
+          else:
+              print('model.json not available; the app will download the model online')
+          PY
+          ls -la www/lib www/model
+
       - name: Create Android project
         run: |
           npm init -y
@@ -150,8 +176,8 @@ jobs:
               } else {
                 b = new Notification.Builder(this);
               }
-              Notification n = b.setContentTitle("丨丕乇爻 丕賱賲丨賱")
-                .setContentText("丕賱賲乇丕賯亘丞 鬲毓賲賱")
+              Notification n = b.setContentTitle("حارس المحل")
+                .setContentText("المراقبة تعمل")
                 .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
                 .setOngoing(true)
                 .build();
@@ -191,7 +217,7 @@ jobs:
           python3 - <<'PY'
           p = 'android/app/src/main/AndroidManifest.xml'
           s = open(p, encoding='utf-8').read()
-          perms = ['CAMERA', 'RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'ACCESS_FINE_LOCATION',
+          perms = ['ACCESS_NETWORK_STATE', 'CAMERA','RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'ACCESS_FINE_LOCATION',
                    'ACCESS_COARSE_LOCATION', 'WAKE_LOCK', 'FOREGROUND_SERVICE',
                    'FOREGROUND_SERVICE_CAMERA', 'FOREGROUND_SERVICE_MICROPHONE',
                    'FOREGROUND_SERVICE_LOCATION', 'FOREGROUND_SERVICE_DATA_SYNC', 'POST_NOTIFICATIONS']
@@ -201,8 +227,14 @@ jobs:
           s = s.replace('</application>', svc + '    </application>', 1)
           open(p, 'w', encoding='utf-8').write(s)
           PY
-          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">丨丕乇爻 丕賱賲丨賱</string>|' android/app/src/main/res/values/strings.xml
-          sed -i 's|<string name="title_activity_main">.*</string>|<string name="title_activity_main">丨丕乇爻 丕賱賲丨賱</string>|' android/app/src/main/res/values/strings.xml
+          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">حارس المحل</string>|' android/app/src/main/res/values/strings.xml
+          sed -i 's|<string name="title_activity_main">.*</string>|<string name="title_activity_main">حارس المحل</string>|' android/app/src/main/res/values/strings.xml
+
+      - name: Keep the same signing key between builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-v1
 
       - name: Sync and build
         run: |
