@@ -347,6 +347,7 @@ jobs:
                   '        </intent-filter>\n'
                   '        </activity>')
           s = s.replace('</activity>', home, 1)
+          s = s.replace('<activity', '<activity android:screenOrientation="sensorLandscape"', 1)
           s = s.replace('<application', add + '    <application', 1)
           s = s.replace('</application>', svc + '    </application>', 1)
           open(p, 'w', encoding='utf-8').write(s)
