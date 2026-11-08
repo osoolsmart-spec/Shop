@@ -315,7 +315,18 @@ jobs:
           npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          # Gradle download was timing out (10s): use the smaller -bin distribution and a long timeout
+          sed -i 's/-all\.zip/-bin.zip/' gradle/wrapper/gradle-wrapper.properties
+          sed -i '/networkTimeout/d' gradle/wrapper/gradle-wrapper.properties
+          echo 'networkTimeout=180000' >> gradle/wrapper/gradle-wrapper.properties
+          cat gradle/wrapper/gradle-wrapper.properties
+          ok=0
+          for i in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon; then ok=1; break; fi
+            echo "Gradle attempt $i failed, retrying in 20s"
+            sleep 20
+          done
+          test $ok -eq 1
 
       - uses: actions/upload-artifact@v4
         with:
