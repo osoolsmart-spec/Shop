@@ -315,9 +315,25 @@ jobs:
           npx cap sync android
           cd android
           chmod +x gradlew
-          # Gradle download was timing out (10s): use the smaller -bin distribution and a long timeout
-          sed -i 's/-all\.zip/-bin.zip/' gradle/wrapper/gradle-wrapper.properties
-          sed -i '/networkTimeout/d' gradle/wrapper/gradle-wrapper.properties
+          # Gradle's own download (via GitHub releases) returned 504, so fetch it ourselves from several sources
+          VER=$(sed -n 's/.*gradle-\([0-9.]*\)-.*zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties | head -1)
+          echo "Gradle version: $VER"
+          ZIP=/tmp/gradle-$VER-bin.zip
+          got=0
+          for url in \
+            "https://services.gradle.org/distributions/gradle-$VER-bin.zip" \
+            "https://mirrors.cloud.tencent.com/gradle/gradle-$VER-bin.zip" \
+            "https://mirrors.aliyun.com/gradle/gradle-$VER-bin.zip"; do
+            echo "Trying $url"
+            if curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 20 --max-time 300 -o "$ZIP" "$url" && unzip -tq "$ZIP" > /dev/null 2>&1; then
+              got=1; break
+            fi
+            echo "Failed: $url"
+          done
+          test $got -eq 1
+          sed -i '/distributionUrl/d;/validateDistributionUrl/d;/networkTimeout/d' gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=file\\:$ZIP" >> gradle/wrapper/gradle-wrapper.properties
+          echo 'validateDistributionUrl=false' >> gradle/wrapper/gradle-wrapper.properties
           echo 'networkTimeout=180000' >> gradle/wrapper/gradle-wrapper.properties
           cat gradle/wrapper/gradle-wrapper.properties
           ok=0
