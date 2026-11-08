@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<title>حارس المحل</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:16px;max-width:520px;margin-inline:auto}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:#1e293b;border-radius:14px;padding:14px;margin-bottom:12px}
+.badge{display:inline-block;padding:6px 14px;border-radius:99px;font-weight:700;font-size:15px}
+.idle{background:#334155}.arming{background:#b45309}.armed{background:#15803d}.alert{background:#b91c1c;animation:p 1s infinite}
+@keyframes p{50%{opacity:.5}}
+button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:#334155;color:#fff;cursor:pointer}
+button.main{width:100%;padding:20px;font-size:22px;font-weight:700;background:#16a34a;margin-top:10px}
+button.main.off{background:#dc2626}
+button.main.wait{background:#d97706}
+label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;font-size:15px}
+input[type=text],input[type=number],input[type=password],select{background:#0f172a;color:#fff;border:1px solid #475569;border-radius:8px;padding:8px;font:inherit;max-width:55%}
+input[type=range]{width:55%}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.topic{direction:ltr;text-align:left;background:#0f172a;border-radius:8px;padding:8px;word-break:break-all;font-family:monospace;font-size:13px}
+video{width:100%;height:150px;object-fit:cover;background:#000;border-radius:10px}
+pre{white-space:pre-wrap;font-size:12px;color:#94a3b8;margin:0;direction:ltr;text-align:left}
+small{color:#94a3b8;line-height:1.6;display:block}
+#dim{position:fixed;inset:0;background:#000;display:none;z-index:9;align-items:flex-end;justify-content:center;padding:20px;color:#1f2937;font-size:12px}
+details summary{cursor:pointer;font-weight:700}
+</style>
+</head>
+<body>
+<h1>🛡️ حارس المحل</h1>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span id="badge" class="badge idle">متوقف</span>
+    <span id="net" style="font-size:13px"></span>
+  </div>
+  <button id="mainBtn" class="main">🔒 تفعيل النظام</button>
+  <div style="margin-top:10px">
+    <video id="video" muted playsinline></video>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="previewBtn">معاينة الكاميرا</button>
+    <button id="dimBtn">شاشة سوداء</button>
+    <button id="testBtn">إرسال اختبار</button>
+  </div>
+  <small style="margin-top:8px">الكاميرا <span id="s-cam">—</span> · الصوت <span id="s-mic">—</span> · الحركة <span id="s-mot">—</span></small>
+</div>
+
+<div class="card">
+  <div style="font-weight:700">⚙️ الإعدادات</div>
+  <label>اسم هذا الهاتف <input type="text" id="name"></label>
+  <label>الكاميرا
+    <select id="facing"><option value="environment">الخلفية</option><option value="user">الأمامية</option></select>
+  </label>
+  <label>مهلة الخروج (ثانية) <input type="number" id="delay" min="0" max="120" style="width:90px"></label>
+  <label>رمز إيقاف (اختياري) <input type="password" id="pin" inputmode="numeric" placeholder="بدون" style="width:110px"></label>
+  <label><span>كشف الحركة بالكاميرا</span><input type="checkbox" id="camera"></label>
+  <label><span>التعرف على الأجسام (يقلل الإنذارات الخاطئة)</span><input type="checkbox" id="detect"></label>
+  <label>ينبّه عند رصد
+    <select id="detMode"><option value="person">شخص فقط</option><option value="pv">شخص أو مركبة</option><option value="all">شخص أو مركبة أو حيوان</option></select>
+  </label>
+  <label><span>كشف الصوت (فتح الباب/جرس)</span><input type="checkbox" id="sound"></label>
+  <label><span>كشف تحريك الهاتف</span><input type="checkbox" id="motion"></label>
+  <label><span>إرسال صور مع التنبيه</span><input type="checkbox" id="snap"></label>
+  <label><span>تسجيل صوتي 10 ثوانٍ بعد الإنذار</span><input type="checkbox" id="rec"></label>
+  <label><span>فيديو 20 ثانية مع صوت بعد الإنذار (تيليغرام)</span><input type="checkbox" id="tgVideo"></label>
+  <label><span>تتبع الموقع إذا حُرّك الهاتف أو فُصل الشاحن</span><input type="checkbox" id="loc"></label>
+  <label id="keepRow" style="display:none"><span>إبقاء الشاشة مضاءة (الأوثق). ألغِه لتجربة الإطفاء</span><input type="checkbox" id="keepon"></label>
+  <label id="noOffRow" style="display:none"><span>منع إطفاء الشاشة بزر الطاقة (تُعاد إضاءتها فوراً أثناء المراقبة)</span><input type="checkbox" id="noOff"></label>
+  <label>الحساسية <input type="range" id="sens" min="0" max="100"></label>
+</div>
+
+<div class="card">
+  <div style="font-weight:700;margin-bottom:6px">📲 ربط هاتفك الرئيسي</div>
+  <small>1) ثبّت تطبيق <b>ntfy</b> على هاتفك الرئيسي.<br>2) اضغط (+) واشترك في هذا الاسم بالضبط:</small>
+  <div class="topic" id="topicBox" style="margin:8px 0"></div>
+  <div class="row">
+    <button id="copyBtn">نسخ</button>
+    <button id="newTopicBtn">اسم جديد</button>
+  </div>
+  <small style="margin-top:8px">استخدم نفس الاسم في الهاتفين. في إعدادات ntfy فعّل «تجاوز عدم الإزعاج» للتنبيهات العاجلة. لا تشارك هذا الاسم مع أحد لأنه بمثابة كلمة السر.</small>
+</div>
+
+<div class="card" id="autoCard" style="display:none">
+  <div style="font-weight:700;margin-bottom:6px">🚀 التشغيل التلقائي والأولوية</div>
+  <label><span>تفعيل المراقبة تلقائياً فور فتح التطبيق (بعد 5 ثوانٍ)</span><input type="checkbox" id="autoarm"></label>
+  <div class="row">
+    <button id="homeBtn">1) جعله الشاشة الرئيسية</button>
+    <button id="ovBtn">2) السماح بالعرض فوق التطبيقات</button>
+    <button id="batBtn">3) استثناؤه من توفير البطارية</button>
+  </div>
+  <small style="margin-top:8px">يبدأ التطبيق المراقبة وحده بعد 5 ثوانٍ من كل فتح. لإيقافها في تلك اللحظة اضغط «إلغاء» أثناء العدّ التنازلي، أو ألغِ هذا الخيار. في هواتف شاومي وسامسونغ فعّل أيضاً «التشغيل التلقائي» للتطبيق من إعدادات التطبيقات.</small>
+</div>
+
+<div class="card">
+  <div style="font-weight:700;margin-bottom:6px">✈️ تيليغرام (الأوثق، بدون حد يومي)</div>
+  <small>1) في تيليغرام افتح <b>@BotFather</b> واكتب <b>/newbot</b> واتبع الخطوات، ثم انسخ الرمز (Token).<br>2) افتح البوت الجديد واضغط Start وأرسل له أي رسالة.<br>3) الصق الرمز هنا واضغط «جلب Chat ID» ثم «إرسال اختبار».</small>
+  <label>رمز البوت <input type="password" id="tgToken" style="max-width:60%;direction:ltr"></label>
+  <label>Chat ID <input type="text" id="tgChat" inputmode="numeric" style="max-width:60%;direction:ltr"></label>
+  <div class="row"><button id="tgFindBtn">جلب Chat ID</button></div>
+  <label style="margin-top:10px"><span>التحكم عن بعد: من تيليغرام أرسل للبوت /photo أو /live أو /clip أو /listen</span><input type="checkbox" id="remote"></label>
+  <small>البوت الواحد يستمع له هاتف واحد فقط. إذا كان لديك هاتفان للمحل فأوقف هذا الخيار في أحدهما، أو أنشئ بوتاً ثانياً.</small>
+  <small style="margin-top:8px">لا تشارك الرمز مع أحد. يُحفظ على هذا الهاتف فقط.</small>
+</div>
+
+<div class="card"><pre id="log">—</pre></div>
+
+<details class="card">
+  <summary>💡 نصائح التشغيل</summary>
+  <small>• أبقِ الهاتف موصولاً بالشاحن والتطبيق مفتوحاً في الواجهة؛ المتصفح يوقف المراقبة إذا أُغلقت الشاشة أو صُغّر التطبيق (سيصلك تنبيه إذا حدث ذلك).<br>
+  • افتح الملف عبر رابط https (مثل Netlify Drop أو GitHub Pages) وإلا لن تعمل الكاميرا.<br>
+  • وجّه الكاميرا نحو مدخل الباب، واستعمل «معاينة الكاميرا» للضبط.<br>
+  • جرّب الحساسية أثناء النهار قبل الاعتماد عليها ليلاً.</small>
+</details>
+
+<div id="dim">المس الشاشة للعودة</div>
+<div id="lock" style="position:fixed;inset:0;background:#000;display:none;z-index:99999;touch-action:none"><div id="lockCorner" style="position:absolute;top:0;left:0;width:90px;height:90px"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+function rand(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,x=>(x%36).toString(36)).join('')}
+
+function NATIVE(){
+  try{return (window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?Capacitor.Plugins.ShopNative:null}catch(e){return null}
+}
+const cfg={
+  keepon:store.get('keepon',true),
+  detect:store.get('detect',true),detMode:store.get('detMode','person'),autoarm:store.get('autoarm',true),
+  remote:store.get('remote',true),
+  topic:store.get('topic',''),name:store.get('name','هاتف الباب'),facing:store.get('facing','environment'),
+  delay:store.get('delay',20),pin:store.get('pin',''),camera:store.get('camera',true),
+  sound:store.get('sound',false),motion:store.get('motion',true),snap:store.get('snap',true),sens:store.get('sens',50),
+  rec:store.get('rec',true),tgVideo:store.get('tgVideo',true),noOff:store.get('noOff',true),loc:store.get('loc',true),
+  tgToken:store.get('tgToken',''),tgChat:store.get('tgChat','')
+};
+if(!cfg.topic){cfg.topic='shop-'+rand(18);store.set('topic',cfg.topic)}
+/* Chat ID يجب أن يكون رقماً، فإن كان نصاً (اسم البوت مثلاً) نمسحه */
+if(cfg.tgChat&&!/^-?\d+$/.test(String(cfg.tgChat).trim())){cfg.tgChat='';store.set('tgChat','')}
+
+let theft=store.get('theft',false);
+let state='idle',alerts=0,lastAlert=0,armedAt=0,logs=[],alertTimes=[];
+const video=$('video');
+
+function log(m){
+  const t=new Date().toLocaleTimeString('en-GB');
+  logs.unshift(t+'  '+m);logs.length=Math.min(logs.length,8);
+  $('log').textContent=logs.join('\n');
+}
+
+/* ---------- الإعدادات ---------- */
+function loadUI(){
+  $('name').value=cfg.name;$('facing').value=cfg.facing;$('delay').value=cfg.delay;$('pin').value=cfg.pin;
+  ['camera','sound','motion','snap','rec','tgVideo','noOff','loc','keepon','detect','autoarm','remote'].forEach(k=>$(k).checked=cfg[k]);
+  if(NATIVE()){$('keepRow').style.display='flex';$('noOffRow').style.display='flex';$('autoCard').style.display='block'}
+  $('sens').value=cfg.sens;$('topicBox').textContent=cfg.topic;
+  $('tgToken').value=cfg.tgToken;$('tgChat').value=cfg.tgChat;$('detMode').value=cfg.detMode;
+}
+['name','facing','delay','pin','sens','detMode'].forEach(k=>$(k).addEventListener('change',()=>{
+  cfg[k]=(k==='delay'||k==='sens')?Number($(k).value):$(k).value;store.set(k,cfg[k]);
+}));
+['camera','sound','motion','snap','rec','tgVideo','noOff','loc','keepon','detect','autoarm','remote'].forEach(k=>$(k).addEventListener('change',()=>{cfg[k]=$(k).checked;store.set(k,cfg[k])}));
+$('noOff').addEventListener('change',()=>applyGuard());
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(cfg.topic);log('تم نسخ الاسم')}catch(e){log('انسخه يدوياً')}};
+$('newTopicBtn').onclick=()=>{
+  if(!confirm('سيتغير اسم القناة ويجب إعادة الاشتراك في ntfy بالاسم الجديد في هاتفك. متابعة؟'))return;
+  cfg.topic='shop-'+rand(18);store.set('topic',cfg.topic);$('topicBox').textContent=cfg.topic;
+};
+
+/* ---------- الإرسال ---------- */
+const queue=[];
+function setNet(ok){$('net').textContent=ok?'🟢 متصل':'🔴 لا يوجد اتصال'}
+let lastErr='';
+async function post(p){
+  try{
+    const r=await fetch('https://ntfy.sh/',{method:'POST',body:JSON.stringify(p)});
+    if(!r.ok){
+      let t='';try{t=(await r.text()).slice(0,140)}catch(e){}
+      lastErr='HTTP '+r.status+' '+t;
+      if(r.status===429)pauseUntil=Date.now()+3600000;
+      return false;
+    }
+    lastErr='';return true;
+  }catch(e){lastErr=(e&&e.message)?e.message:String(e);return false}
+}
+/* ---------- تيليغرام ---------- */
+let lastTgErr='';
+function tgOn(){return !!(cfg.tgToken&&/^-?\d+$/.test(String(cfg.tgChat).trim()))}
+async function tgCallJ(method,fd){
+  try{
+    const r=await fetch('https://api.telegram.org/bot'+cfg.tgToken+'/'+method,{method:'POST',body:fd});
+    const j=await r.json();
+    if(!j.ok){lastTgErr=j.description||('HTTP '+r.status);return null}
+    return j;
+  }catch(e){lastTgErr=(e&&e.message)?e.message:String(e);return null}
+}
+async function tgCall(method,fd){return !!(await tgCallJ(method,fd))}
+function tgForm(extra){
+  const fd=new FormData();fd.append('chat_id',cfg.tgChat);
+  for(const k in extra){fd.append(k,extra[k])}
+  return fd;
+}
+function tgText(text){return tgCall('sendMessage',tgForm({text:text}))}
+function tgPhoto(blob,caption){const fd=tgForm({caption:caption});fd.append('photo',blob,'alert.jpg');return tgCall('sendPhoto',fd)}
+function tgFile(blob,name,caption){const fd=tgForm({caption:caption});fd.append('document',blob,name);return tgCall('sendDocument',fd)}
+async function tgFind(){
+  cfg.tgToken=$('tgToken').value.trim();store.set('tgToken',cfg.tgToken);
+  if(!cfg.tgToken){log('الصق رمز البوت أولاً');return}
+  try{
+    tgHold=true;   /* نوقف الاستماع للأوامر مؤقتاً حتى لا يسحب الرسائل */
+    for(let i=0;i<30&&tgPolling;i++)await sleep(1000);
+    const r=await fetch('https://api.telegram.org/bot'+cfg.tgToken+'/getUpdates');
+    const j=await r.json();
+    if(!j.ok){log('تيليغرام: '+(j.description||'رمز غير صحيح'));return}
+    const m=(j.result||[]).map(x=>x.message||x.channel_post).filter(Boolean).pop();
+    if(!m){log('افتح بوتك في تيليغرام وأرسل له /start ثم اضغط «جلب Chat ID» مرة أخرى');return}
+    cfg.tgChat=String(m.chat.id);store.set('tgChat',cfg.tgChat);$('tgChat').value=cfg.tgChat;
+    log('تم جلب Chat ID: '+cfg.tgChat);
+  }catch(e){log('تعذر الاتصال بتيليغرام')}
+  finally{tgHold=false}
+}
+
+/* ---------- التحكم عن بعد عبر تيليغرام ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let tgHold=false,tgOffset=null,tgPolling=false,liveTimer=null,liveWasOff=false,liveBusy=false,recordingClip=false,cmdsSet=false;
+async function tgGet(method,params){
+  const q=Object.keys(params||{}).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
+  const r=await fetch('https://api.telegram.org/bot'+cfg.tgToken+'/'+method+'?'+q);
+  return await r.json();
+}
+async function tgPoll(){
+  if(tgPolling||!cfg.remote||!tgOn())return;
+  tgPolling=true;
+  try{
+    if(!cmdsSet){
+      const fd=new FormData();
+      fd.append('commands',JSON.stringify([
+        {command:'photo',description:'صورة الآن'},
+        {command:'live',description:'بث شبه مباشر (صورة تتجدد كل 3 ثوانٍ)'},
+        {command:'stop',description:'إيقاف البث'},
+        {command:'clip',description:'فيديو 10 ثوانٍ'},
+        {command:'listen',description:'الاستماع 15 ثانية'},
+        {command:'where',description:'موقع الهاتف'},
+        {command:'theft',description:'وضع السرقة: شاشة سوداء وقفل وتتبع'},
+        {command:'untheft',description:'إلغاء وضع السرقة'},
+        {command:'status',description:'حالة النظام'}
+      ]));
+      tgCall('setMyCommands',fd);cmdsSet=true;
+    }
+    if(tgOffset===null){
+      const r=await tgGet('getUpdates',{offset:-1,timeout:0});
+      const last=(r.result||[]).pop();tgOffset=last?last.update_id+1:0;
+    }
+    while(cfg.remote&&tgOn()&&!tgHold){
+      const r=await tgGet('getUpdates',{offset:tgOffset,timeout:25});
+      if(!r.ok){await sleep(8000);continue}
+      for(const u of r.result){tgOffset=u.update_id+1;handleUpdate(u)}
+    }
+  }catch(e){}
+  tgPolling=false;
+  if(cfg.remote&&tgOn())setTimeout(tgPoll,8000);
+}
+function handleUpdate(u){
+  const m=u.message;
+  if(!m||!m.text||String(m.chat.id)!==String(cfg.tgChat))return;   /* نقبل أوامر محادثتك فقط */
+  const cmd=m.text.trim().split(/[\s@]/)[0].toLowerCase();
+  const map={'/photo':cmdPhoto,'/live':cmdLive,'/stop':cmdStop,'/clip':()=>cmdClip(10,false),
+             '/listen':()=>cmdClip(15,true),'/where':cmdWhere,'/status':cmdStatus,'/theft':cmdTheftOn,'/untheft':cmdTheftOff,'/help':cmdHelp,'/start':cmdHelp};
+  const fn=map[cmd];
+  if(fn){log('أمر عن بعد: '+cmd);Promise.resolve().then(fn).catch(e=>log('فشل الأمر: '+((e&&e.message)||e)))}
+}
+function cmdHelp(){
+  return tgText('الأوامر:\n/photo صورة الآن\n/live بث شبه مباشر\n/stop إيقاف البث\n/clip فيديو 10 ثوانٍ\n/listen استماع 15 ثانية\n/where الموقع\n/theft وضع السرقة\n/untheft إلغاؤه\n/status الحالة');
+}
+async function warmCamera(){
+  const was=!!stream;
+  if(!was)await startCamera();
+  await sleep(was?100:700);
+  return was;
+}
+function releaseCamera(was){
+  if(!was&&state==='idle'&&!previewOn&&!liveTimer)stopCamera();
+}
+async function cmdPhoto(){
+  const was=await warmCamera();
+  try{
+    const b=await grab();
+    if(!b){await tgText('الكاميرا غير متاحة الآن');return}
+    await tgPhoto(b,'📷 '+cfg.name+' · '+new Date().toLocaleTimeString('en-GB'));
+  }finally{releaseCamera(was)}
+}
+async function cmdLive(){
+  if(liveTimer){await tgText('البث يعمل بالفعل. أرسل /stop لإيقافه');return}
+  const was=await warmCamera();
+  const b=await grab();
+  if(!b){releaseCamera(was);await tgText('الكاميرا غير متاحة الآن');return}
+  const fd=tgForm({caption:'🔴 مباشر · '+cfg.name});fd.append('photo',b,'live.jpg');
+  const res=await tgCallJ('sendPhoto',fd);
+  const id=res&&res.result&&res.result.message_id;
+  if(!id){releaseCamera(was);return}
+  liveWasOff=!was;
+  const start=Date.now();
+  liveTimer=setInterval(async()=>{
+    if(Date.now()-start>120000){endLive();return}
+    if(liveBusy)return;
+    liveBusy=true;
+    try{
+      const f=await grab();
+      if(f){
+        const e=tgForm({message_id:id,media:JSON.stringify({type:'photo',media:'attach://p',caption:'🔴 مباشر · '+cfg.name+' · '+new Date().toLocaleTimeString('en-GB')})});
+        e.append('p',f,'live.jpg');
+        await tgCall('editMessageMedia',e);
+      }
+    }catch(e){}
+    liveBusy=false;
+  },3000);
+  tgText('البث يستمر دقيقتين. أرسل /stop لإيقافه');
+}
+function endLive(){
+  clearInterval(liveTimer);liveTimer=null;
+  if(liveWasOff&&state==='idle'&&!previewOn)stopCamera();
+  tgText('⏹ انتهى البث');
+}
+async function cmdStop(){
+  if(liveTimer)endLive();else await tgText('لا يوجد بث يعمل');
+}
+async function cmdClip(sec,audioOnly){
+  if(recordingClip){await tgText('تسجيل آخر جارٍ، انتظر قليلاً');return}
+  recordingClip=true;
+  const hadCam=!!stream,hadMic=!!audioStream;
+  try{
+    await tgText((audioOnly?'🎙️ أستمع ':'🎥 أصوّر ')+sec+' ثانية...');
+    if(!audioOnly&&!hadCam)await startCamera();
+    if(!hadMic)await startMic();
+    await sleep(500);
+    const tracks=[];
+    if(!audioOnly&&stream)tracks.push(...stream.getVideoTracks());
+    if(audioStream)tracks.push(...audioStream.getAudioTracks());
+    if(!tracks.length||typeof MediaRecorder==='undefined'){await tgText('الكاميرا أو الميكروفون غير متاحين');return}
+    const ms=new MediaStream(tracks);
+    const types=audioOnly?['audio/webm;codecs=opus','audio/webm','audio/mp4']
+      :['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm'];
+    const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||'';
+    const rec=new MediaRecorder(ms,mime?{mimeType:mime}:{});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    const done=new Promise(r=>{rec.onstop=r});
+    rec.start();await sleep(sec*1000);rec.stop();await done;
+    const type=rec.mimeType||mime||'video/webm';
+    const blob=new Blob(chunks,{type});
+    if(!blob.size){await tgText('فشل التسجيل');return}
+    const ext=type.includes('mp4')?(audioOnly?'m4a':'mp4'):'webm';
+    const cap=(audioOnly?'🎙️ ':'🎥 ')+cfg.name+' · '+new Date().toLocaleTimeString('en-GB');
+    if(!audioOnly&&ext==='mp4'){
+      const fd=tgForm({caption:cap,supports_streaming:'true'});fd.append('video',blob,'clip.mp4');
+      await tgCall('sendVideo',fd);
+    }else{
+      await tgFile(blob,(audioOnly?'listen.':'clip.')+ext,cap);
+    }
+  }finally{
+    recordingClip=false;
+    if(!hadCam&&state==='idle'&&!previewOn&&!liveTimer)stopCamera();
+    if(!hadMic&&state==='idle')stopMic();
+  }
+}
+async function cmdWhere(){
+  try{
+    const c=(await getPos()).coords;
+    await tgCall('sendLocation',tgForm({latitude:c.latitude,longitude:c.longitude}));
+    await tgText('📍 '+cfg.name+' · الدقة ~'+Math.round(c.accuracy)+' م\nhttps://www.google.com/maps?q='+c.latitude+','+c.longitude);
+  }catch(e){await tgText('تعذر تحديد الموقع (تحقق من إذن الموقع)')}
+}
+async function cmdStatus(){
+  let bat='؟';
+  try{const b=await navigator.getBattery();bat=Math.round(b.level*100)+'%'+(b.charging?' (يُشحن)':' (على البطارية)')}catch(e){}
+  const st={idle:'متوقف',arming:'يُفعَّل...',armed:'يعمل ✅'}[state]||state;
+  await tgText('📊 '+cfg.name+'\nالحالة: '+st+'\nوضع السرقة: '+(theft?'مفعّل 🚨':'معطّل')+'\nالإنذارات: '+alerts+'\nالبطارية: '+bat+
+    '\nالتعرف على الأجسام: '+(detector?'جاهز':(cfg.detect?'لم يُحمَّل بعد':'معطّل')));
+}
+
+let pauseUntil=0;
+function enc(s){return '=?UTF-8?B?'+b64(s)+'?='}
+/* ميزانية يومية لحماية الحد المجاني (250 رسالة/يوم) */
+function spend(prio){
+  const d=new Date().toDateString();
+  let b=store.get('budget',{d:'',n:0});
+  if(b.d!==d)b={d:d,n:0};
+  const cap=prio>=5?230:170;
+  if(b.n>=cap){log('بلغنا الحد اليومي للرسائل، أُوقف الإرسال');return false}
+  b.n++;store.set('budget',b);return true;
+}
+function queueAdd(p){
+  if(queue.length>=10)queue.shift();
+  queue.push(p);
+}
+async function notify(title,message,priority,tags,click,noTg){
+  const p={topic:cfg.topic,title,message,priority:priority||3,tags:tags||[]};
+  if(click)p.click=click;
+  if(tgOn()&&!noTg){
+    tgText(title+'\n'+message+(click?'\n'+click:'')).then(ok=>{if(ok)setNet(true);else log('تيليغرام: '+lastTgErr)});
+  }
+  if(!spend(priority||3))return false;
+  if(Date.now()<pauseUntil){lastErr='الخدمة محدودة مؤقتاً (429)، سيُعاد الإرسال لاحقاً';queueAdd(p);return false}
+  const ok=await post(p);
+  setNet(ok);
+  if(!ok){queueAdd(p);log('تعذر الإرسال، ستُعاد المحاولة')}
+  return ok;
+}
+/* إعادة المحاولة كل دقيقة فقط، وتتوقف أثناء فترة الحد */
+setInterval(async()=>{
+  if(!queue.length||Date.now()<pauseUntil)return;
+  if(await post(queue[0])){queue.shift();setNet(true)}
+},60000);
+
+/* رسالة إنذار واحدة تحمل الصورة والنص معاً */
+async function grab(){
+  if(!stream||!video.videoWidth)return null;
+  const c=document.createElement('canvas');
+  c.width=Math.min(video.videoWidth,960);c.height=Math.round(c.width*video.videoHeight/video.videoWidth);
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.7));
+}
+/* وصف ما في الصورة وقت الإنذار (مهما كان مصدره) */
+let lastPreds=[],lastAlertText='';
+async function describeScene(){
+  lastPreds=[];
+  if(!cfg.detect||!detector||!stream||!video.videoWidth)return '';
+  try{
+    const preds=await detector.detect(video);
+    lastPreds=preds.filter(p=>p.score>=0.45&&AR[p.class]);
+    if(!lastPreds.length)return ' · 🔍 التعرف: لا يوجد شخص أو جسم معروف في الصورة';
+    const g={};
+    lastPreds.forEach(p=>{const k=AR[p.class];(g[k]=g[k]||[]).push(p.score)});
+    const txt=Object.keys(g).map(k=>k+(g[k].length>1?' ×'+g[k].length:'')+' ('+Math.round(Math.max(...g[k])*100)+'%)').join('، ');
+    return ' · 🔍 التعرف: '+txt;
+  }catch(e){return ''}
+}
+/* صورة مع مربعات حول الأهداف المكتشفة */
+async function grabAnnotated(){
+  if(!stream||!video.videoWidth)return null;
+  const c=document.createElement('canvas');
+  c.width=Math.min(video.videoWidth,960);c.height=Math.round(c.width*video.videoHeight/video.videoWidth);
+  const x=c.getContext('2d');x.drawImage(video,0,0,c.width,c.height);
+  const k=c.width/video.videoWidth;
+  x.lineWidth=3;x.font='bold 18px sans-serif';
+  for(const p of lastPreds){
+    const bx=p.bbox[0]*k,by=p.bbox[1]*k,bw=p.bbox[2]*k,bh=p.bbox[3]*k;
+    const t=(AR[p.class]||p.class)+' '+Math.round(p.score*100)+'%';
+    const w=x.measureText(t).width+10,ty=Math.max(0,by-24);
+    x.strokeStyle='#ef4444';x.strokeRect(bx,by,bw,bh);
+    x.fillStyle='#ef4444';x.fillRect(bx,ty,w,24);
+    x.fillStyle='#fff';x.fillText(t,bx+5,ty+18);
+  }
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.75));
+}
+/* فيديو مع صوت بعد الإنذار يُرسل إلى تيليغرام */
+let recordingVideo=false;
+function recordVideo(sec){
+  if(!cfg.tgVideo||!tgOn()||recordingVideo||recordingClip||!stream||typeof MediaRecorder==='undefined')return;
+  const tracks=[...stream.getVideoTracks()];
+  if(audioStream)tracks.push(...audioStream.getAudioTracks());
+  const types=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm'];
+  const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||'';
+  const opts=mime?{mimeType:mime,videoBitsPerSecond:800000}:{videoBitsPerSecond:800000};
+  let rec;
+  try{rec=new MediaRecorder(new MediaStream(tracks),opts)}catch(e){log('تسجيل الفيديو غير مدعوم');return}
+  recordingVideo=true;
+  const chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=async()=>{
+    recordingVideo=false;
+    const type=rec.mimeType||mime||'video/webm';
+    const blob=new Blob(chunks,{type});
+    if(!blob.size)return;
+    const cap='🎥 فيديو '+sec+' ث — '+cfg.name+'\n'+lastAlertText;
+    let ok;
+    if(type.includes('mp4')){
+      const fd=tgForm({caption:cap,supports_streaming:'true'});fd.append('video',blob,'alert.mp4');
+      ok=await tgCall('sendVideo',fd);
+    }else ok=await tgFile(blob,'alert.webm',cap);
+    log(ok?'🎥 أُرسل الفيديو':'تيليغرام: '+lastTgErr);
+  };
+  rec.start();
+  setTimeout(()=>{if(rec.state!=='inactive')rec.stop()},sec*1000);
+  log('🎥 جارٍ تسجيل فيديو '+sec+' ث');
+}
+async function sendAlert(title,msg){
+  const scene=await describeScene();
+  if(scene)msg+=scene;
+  lastAlertText=title+'\n'+msg;
+  const blob=cfg.snap?await grabAnnotated():null;
+  let tgDone=false;
+  if(tgOn()&&blob){
+    tgDone=true;
+    tgPhoto(blob,title+'\n'+msg).then(ok=>{if(ok)setNet(true);else log('تيليغرام: '+lastTgErr)});
+  }
+  if(!blob||Date.now()<pauseUntil)return notify(title,msg,5,['rotating_light'],undefined,tgDone);
+  if(!spend(5))return;
+  try{
+    const r=await fetch('https://ntfy.sh/'+cfg.topic,{method:'PUT',body:blob,headers:{Filename:'alert.jpg',Title:enc(title),Message:enc(msg),Priority:'5',Tags:'rotating_light'}});
+    if(r.status===429)pauseUntil=Date.now()+3600000;
+    if(!r.ok)throw 0;
+    setNet(true);
+  }catch(e){queueAdd({topic:cfg.topic,title:title,message:msg,priority:5,tags:['rotating_light']});log('تعذر إرسال الإنذار')}
+}
+
+function b64(s){return btoa(unescape(encodeURIComponent(s)))}
+async function snapshot(n,total){
+  if(!cfg.snap||!stream||!video.videoWidth){if(n===1)log('لا توجد صورة: الكاميرا غير شغّالة');return}
+  const c=document.createElement('canvas');
+  c.width=Math.min(video.videoWidth,960);c.height=Math.round(c.width*video.videoHeight/video.videoWidth);
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.7));
+  if(!blob)return;
+  const title='=?UTF-8?B?'+b64('📷 '+cfg.name+' ('+n+'/'+total+')')+'?=';
+  try{
+    const r=await fetch('https://ntfy.sh/'+cfg.topic,{method:'PUT',body:blob,headers:{Filename:'snapshot-'+n+'.jpg',Title:title,Priority:'4'}});
+    if(!r.ok)throw 0;
+  }catch(e){log('تعذر إرسال الصورة '+n)}
+}
+/* 3 صور بعد كل إنذار: فوراً، بعد 3 ثوانٍ، بعد 7 ثوانٍ */
+function snapshotBurst(){[0,3000,7000].forEach((d,i)=>setTimeout(()=>snapshot(i+1,3),d))}
+
+/* ---------- الحساسات ---------- */
+let stream=null,audioStream=null,actx=null,analyser=null,previewOn=false;
+
+async function startCamera(){
+  if(stream)return;
+  try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:cfg.facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream;await video.play();$('s-cam').textContent='✅';
+  }catch(e){stream=null;$('s-cam').textContent='❌';log('الكاميرا غير متاحة (تحقق من الإذن وأن الرابط https)')}
+}
+function stopCamera(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null}
+  $('s-cam').textContent='—';
+}
+async function startMic(){
+  if(audioStream)return;
+  try{
+    audioStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false},video:false});
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=actx.createMediaStreamSource(audioStream);
+    analyser=actx.createAnalyser();analyser.fftSize=512;src.connect(analyser);
+    $('s-mic').textContent='✅';
+  }catch(e){audioStream=null;$('s-mic').textContent='❌';log('الميكروفون غير متاح')}
+}
+function stopMic(){
+  if(audioStream){audioStream.getTracks().forEach(t=>t.stop());audioStream=null}
+  if(actx){try{actx.close()}catch(e){}actx=null}analyser=null;$('s-mic').textContent='—';
+}
+let motionListening=false,lastAcc=null;
+async function startMotion(){
+  if(motionListening)return;
+  try{
+    if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
+      const r=await DeviceMotionEvent.requestPermission();if(r!=='granted'){$('s-mot').textContent='❌';return}
+    }
+    window.addEventListener('devicemotion',onMotion);motionListening=true;$('s-mot').textContent='✅';
+  }catch(e){$('s-mot').textContent='❌'}
+}
+function stopMotion(){window.removeEventListener('devicemotion',onMotion);motionListening=false;lastAcc=null;$('s-mot').textContent='—'}
+function onMotion(e){
+  const a=e.accelerationIncludingGravity;if(!a||a.x==null)return;
+  if(lastAcc&&state==='armed'&&Date.now()-armedAt>3000){
+    const d=Math.abs(a.x-lastAcc.x)+Math.abs(a.y-lastAcc.y)+Math.abs(a.z-lastAcc.z);
+    const thr=3-cfg.sens*0.025;
+    if(d>thr)trigger('تم تحريك الهاتف',true);
+  }
+  lastAcc={x:a.x,y:a.y,z:a.z};
+}
+
+/* كشف الحركة بالكاميرا: مقارنة إطارين متتاليين */
+const mc=document.createElement('canvas');mc.width=48;mc.height=36;
+const mx=mc.getContext('2d',{willReadFrequently:true});
+let prev=null,hits=0;
+setInterval(()=>{
+  if(!stream||!video.videoWidth||video.readyState<2)return;
+  mx.drawImage(video,0,0,48,36);
+  const d=mx.getImageData(0,0,48,36).data;
+  const g=new Uint8Array(48*36);
+  for(let i=0;i<g.length;i++)g[i]=(d[i*4]+d[i*4+1]+d[i*4+2])/3;
+  if(prev&&state==='armed'&&cfg.camera&&Date.now()-armedAt>3000){
+    let c=0;for(let i=0;i<g.length;i++)if(Math.abs(g[i]-prev[i])>28)c++;
+    const ratio=c/g.length,thr=0.10-cfg.sens*0.0009;
+    if(ratio>thr){hits++;if(hits>=2||ratio>thr*2.5){hits=0;onCameraMotion(ratio/thr)}}else hits=0;
+  }
+  prev=g;
+},250);
+
+/* كشف الصوت */
+setInterval(()=>{
+  if(!analyser||state!=='armed'||!cfg.sound||Date.now()-armedAt<3000)return;
+  const buf=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(buf);
+  let s=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;s+=v*v}
+  const rms=Math.sqrt(s/buf.length),thr=0.25-cfg.sens*0.002;
+  if(rms>thr)trigger('رُصد صوت عالٍ');
+},150);
+
+/* ---------- حارس الكاميرا والميكروفون: إعادة التشغيل إذا انقطعا (مثلاً بعد إطفاء الشاشة) ---------- */
+setInterval(async()=>{
+  if(state!=='armed')return;
+  try{
+    if(cfg.camera||cfg.snap||cfg.tgVideo){
+      const dead=!stream||stream.getVideoTracks().every(t=>t.readyState==='ended');
+      if(dead){stream=null;video.srcObject=null;log('أُعيد تشغيل الكاميرا');await startCamera()}
+      else if(video.paused)video.play().catch(()=>{});
+    }
+    if(cfg.sound||cfg.rec||cfg.tgVideo){
+      const dead=!audioStream||audioStream.getAudioTracks().every(t=>t.readyState==='ended');
+      if(dead&&!recordingClip){audioStream=null;try{if(actx)actx.close()}catch(e){}actx=null;analyser=null;log('أُعيد تشغيل الميكروفون');await startMic()}
+    }
+  }catch(e){}
+},4000);
+
+/* ---------- وضع السرقة ---------- */
+function applyGuard(){
+  try{const n=NATIVE();if(n&&n.setGuard)n.setGuard({noOff:cfg.noOff||theft,black:theft}).catch(()=>{})}catch(e){}
+}
+function setTheft(on){
+  theft=on;store.set('theft',on);
+  $('lock').style.display=on?'block':'none';
+  applyGuard();
+  stopTracking();
+  if(on){
+    if(!cfg.remote){cfg.remote=true;store.set('remote',true);$('remote').checked=true;tgPoll()}
+    $('dim').style.display='none';
+    if(state==='idle')arm(0);
+    startTracking();
+    log('🚨 وضع السرقة مفعّل');
+  }else{
+    log('تم إلغاء وضع السرقة');
+  }
+  render();
+}
+$('lock').addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+$('lock').addEventListener('contextmenu',e=>e.preventDefault());
+/* مخرج احتياطي محلي: 7 نقرات في الزاوية العلوية اليسرى ثم رمز الإيقاف (إن كان مضبوطاً) */
+let ct=0,ctT=0;
+$('lockCorner').addEventListener('click',()=>{
+  const n=Date.now();if(n-ctT>2500)ct=0;ctT=n;ct++;
+  if(ct>=7){
+    ct=0;
+    if(!cfg.pin){log('لا يوجد رمز محلي: الإلغاء من تيليغرام فقط');return}
+    const p=prompt('أدخل رمز الإيقاف');
+    if(p!==null&&p===cfg.pin)setTheft(false);
+  }
+});
+async function cmdTheftOn(){
+  if(theft){await tgText('وضع السرقة مفعّل بالفعل. أرسل /untheft لإلغائه');return}
+  setTheft(true);
+  await tgText('🚨 وضع السرقة مفعّل:\n• الشاشة سوداء ولا تستجيب للمس\n• زر إيقاف النظام معطّل\n• تُعاد إضاءة الشاشة إن أُطفئت، والمراقبة مستمرة\n• الموقع كل 30 ثانية عند التحرك\nللإلغاء: /untheft');
+  setTimeout(()=>{cmdPhoto().catch(()=>{});cmdWhere().catch(()=>{})},3000);
+}
+async function cmdTheftOff(){
+  if(!theft){await tgText('وضع السرقة غير مفعّل');return}
+  setTheft(false);
+  await tgText('✅ أُلغي وضع السرقة. الشاشة والإيقاف يعملان عادياً');
+}
+
+/* ---------- التعرف على الأجسام ---------- */
+const CDN_TF='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+const CDN_COCO='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js';
+const CLASS_SETS={
+  person:new Set(['person']),
+  pv:new Set(['person','car','truck','bus','motorcycle','bicycle']),
+  all:new Set(['person','car','truck','bus','motorcycle','bicycle','cat','dog','bird','horse','sheep','cow','bear'])
+};
+const AR={person:'شخص',car:'سيارة',truck:'شاحنة',bus:'حافلة',motorcycle:'دراجة نارية',bicycle:'دراجة',cat:'قطة',dog:'كلب',bird:'طائر',horse:'حصان',sheep:'خروف',cow:'بقرة',bear:'دب'};
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');s.src=src;s.onload=res;
+    s.onerror=()=>rej(new Error('تعذر تحميل '+src));document.head.appendChild(s);
+  });
+}
+let detector=null,detLoading=null,verifying=false,ignoreUntil=0;
+function getDetector(){
+  if(detector)return Promise.resolve(detector);
+  if(detLoading)return detLoading;
+  detLoading=(async()=>{
+    try{
+      if(!window.tf){try{await loadScript('lib/tf.min.js')}catch(e){await loadScript(CDN_TF)}}
+      if(!window.cocoSsd){try{await loadScript('lib/coco-ssd.min.js')}catch(e){await loadScript(CDN_COCO)}}
+      let m;
+      try{m=await cocoSsd.load({base:'lite_mobilenet_v2',modelUrl:'model/model.json'})}
+      catch(e){m=await cocoSsd.load({base:'lite_mobilenet_v2'})}
+      detector=m;log('تم تحميل نموذج التعرف على الأجسام');try{log('محرك الحساب: '+tf.getBackend())}catch(e){}return m;
+    }catch(e){
+      log('تعذر تحميل نموذج التعرف: '+((e&&e.message)||e));
+      detLoading=null;return null;
+    }
+  })();
+  return detLoading;
+}
+/* عند رصد حركة: نتحقق من نوع الجسم، وإن تعذر التحقق نُنبّه احتياطاً */
+function frameCanvas(){
+  if(!stream||!video.videoWidth)return null;
+  const c=document.createElement('canvas');
+  c.width=video.videoWidth;c.height=video.videoHeight;
+  c.getContext('2d').drawImage(video,0,0);
+  return c;
+}
+/* strength: قوة الحركة نسبةً إلى الحد (3 فأكثر = حركة كبيرة) */
+async function onCameraMotion(strength){
+  const plain='رُصدت حركة أمام الكاميرا';
+  if(!cfg.detect){trigger(plain);return}
+  if(verifying||Date.now()<ignoreUntil)return;
+  verifying=true;
+  try{
+    if(!detector)log('رُصدت حركة، والنموذج لم يُحمَّل بعد');
+    const m=await getDetector();
+    if(!m){trigger(plain);return}
+    const allow=CLASS_SETS[cfg.detMode]||CLASS_SETS.person;
+    let best=null,top='',firstMs=0;const tStart=performance.now();
+    /* نفحص الإطار نفسه ثم إطارين لاحقين، فقد يكون الشخص مرّ بسرعة */
+    for(let i=0;i<3&&!best&&performance.now()-tStart<4000;i++){
+      if(i>0)await sleep(450);
+      const src=frameCanvas();
+      if(!src)break;
+      const t0=performance.now();
+      const preds=await m.detect(src);
+      if(i===0)firstMs=Math.round(performance.now()-t0);
+      if(preds[0]&&!top)top=(AR[preds[0].class]||preds[0].class)+' '+Math.round(preds[0].score*100)+'%';
+      best=preds.filter(p=>allow.has(p.class)&&p.score>=(p.class==='person'?0.35:0.5))
+                .sort((a,b)=>b.score-a.score)[0]||null;
+    }
+    log('زمن فحص الصورة: '+firstMs+' م.ث');
+    if(best)trigger('رُصد '+(AR[best.class]||best.class)+' ('+Math.round(best.score*100)+'%)');
+    else if(strength>=3)trigger('حركة كبيرة أمام الكاميرا (لم يُصنَّف الجسم)');
+    else{
+      ignoreUntil=Date.now()+2000;
+      log('حركة بلا شخص'+(top?' (أعلى احتمال: '+top+')':' (لا أجسام معروفة)'));
+    }
+  }catch(e){trigger(plain)}
+  finally{verifying=false}
+}
+
+/* ---------- الموقع ---------- */
+let lastPos=null,trackTimer=null;
+function getPos(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation)return rej(new Error('no geo'));
+    navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:10000,maximumAge:5000});
+  });
+}
+function dist(a,b){
+  const R=6371000,t=x=>x*Math.PI/180,dLa=t(b.latitude-a.latitude),dLo=t(b.longitude-a.longitude);
+  const h=Math.sin(dLa/2)**2+Math.cos(t(a.latitude))*Math.cos(t(b.latitude))*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+async function sendLocation(label,force){
+  try{
+    const c=(await getPos()).coords;
+    if(!force&&lastPos&&dist(lastPos,c)<50)return;
+    lastPos={latitude:c.latitude,longitude:c.longitude};
+    const url='https://www.google.com/maps?q='+c.latitude+','+c.longitude;
+    await notify('📍 '+label+' — '+cfg.name,'الدقة ~'+Math.round(c.accuracy)+' م · اضغط لفتح الخريطة',5,['round_pushpin'],url);
+    log('📍 أُرسل الموقع');
+  }catch(e){log('تعذر تحديد الموقع (تحقق من إذن الموقع)')}
+}
+function startTracking(){
+  if((!cfg.loc&&!theft)||trackTimer)return;
+  log('بدأ تتبع الموقع');
+  sendLocation('تتبع الموقع',true);
+  trackTimer=setInterval(()=>sendLocation('الهاتف تحرّك',false),theft?30000:60000);
+}
+function stopTracking(){clearInterval(trackTimer);trackTimer=null;lastPos=null}
+
+/* ---------- التسجيل الصوتي ---------- */
+let recording=false;
+function recordAudio(sec){
+  if(!cfg.rec||!audioStream||recording||typeof MediaRecorder==='undefined')return;
+  const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  let rec;
+  try{rec=new MediaRecorder(audioStream,mime?{mimeType:mime}:{})}catch(e){log('التسجيل غير مدعوم');return}
+  recording=true;
+  const chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=async()=>{
+    recording=false;
+    const type=rec.mimeType||mime||'audio/webm';
+    const blob=new Blob(chunks,{type});
+    if(!blob.size)return;
+    const ext=type.includes('mp4')?'m4a':'webm';
+    if(tgOn())tgFile(blob,'audio.'+ext,'🎙️ '+cfg.name+' — تسجيل صوتي 10 ث\n'+lastAlertText).then(ok=>{if(!ok)log('تيليغرام: '+lastTgErr)});
+    if(Date.now()<pauseUntil||!spend(4))return;
+    const title='=?UTF-8?B?'+b64('🎙️ '+cfg.name+' — تسجيل صوتي')+'?=';
+    try{
+      const r=await fetch('https://ntfy.sh/'+cfg.topic,{method:'PUT',body:blob,headers:{Filename:'audio.'+ext,Title:title,Priority:'4'}});
+      if(!r.ok)throw 0;log('🎙️ أُرسل التسجيل الصوتي');
+    }catch(e){log('تعذر إرسال التسجيل')}
+  };
+  rec.start();
+  setTimeout(()=>{if(rec.state!=='inactive')rec.stop()},sec*1000);
+  log('🎙️ جارٍ التسجيل '+sec+' ث');
+}
+
+/* ---------- التنبيه ---------- */
+function trigger(reason,theft){
+  if(state!=='armed')return;
+  const now=Date.now();
+  /* فاصل 60 ث بين الإنذارات، و5 دقائق إذا تكررت 5 مرات خلال 10 دقائق */
+  alertTimes=alertTimes.filter(t=>now-t<600000);
+  const gap=alertTimes.length>=5?300000:60000;
+  if(now-lastAlert<gap){log('إنذار مكتوم: الفاصل بين الإنذارات '+Math.round(gap/1000)+' ث');return}
+  alertTimes.push(now);
+  lastAlert=now;alerts++;
+  const time=new Date().toLocaleTimeString('en-GB');
+  sendAlert('🚨 طوارئ — '+cfg.name,reason+' · '+time);
+  log('🚨 '+reason);
+  recordVideo(20);
+  recordAudio(10);
+  if(theft)startTracking();
+  render();
+}
+
+/* ---------- التفعيل والإيقاف ---------- */
+let wl=null,countdown=null;
+async function keepAwake(){try{if('wakeLock' in navigator)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+async function releaseAwake(){try{if(wl){await wl.release();wl=null}}catch(e){}}
+
+async function arm(delayOverride){
+  state='arming';alerts=0;render();
+  store.set('wasArmed',true);
+  keepAwake();
+  stopCamera();stopMic();
+  if(cfg.camera||cfg.snap||cfg.tgVideo)await startCamera();
+  if(cfg.detect&&stream)getDetector();
+  if(cfg.sound||cfg.rec||cfg.tgVideo)await startMic();
+  if(cfg.loc){try{await getPos()}catch(e){log('وافق على إذن الموقع لتفعيل التتبع')}}
+  {const n=NATIVE();if(n)n.start({keep:cfg.keepon,noOff:cfg.noOff||theft}).catch(()=>{})}
+  if(cfg.motion)await startMotion();
+  let t=Math.max(0,(typeof delayOverride==='number')?delayOverride:cfg.delay);
+  const tick=()=>{
+    if(state!=='arming')return;
+    if(t<=0){
+      state='armed';armedAt=Date.now();prev=null;hits=0;lastAcc=null;
+      notify('✅ تم تفعيل النظام — '+cfg.name,'المراقبة تعمل الآن',3,['white_check_mark']);
+      log('تم التفعيل');render();return;
+    }
+    $('badge').textContent='يُفعَّل بعد '+t+' ث';t--;countdown=setTimeout(tick,1000);
+  };
+  tick();
+}
+function disarm(){
+  if(theft){log('وضع السرقة: الإيقاف من تيليغرام فقط (/untheft)');return}
+  if(state==='armed'&&cfg.pin){
+    const p=prompt('أدخل رمز الإيقاف');if(p===null)return;
+    if(p!==cfg.pin){
+      notify('⚠️ محاولة إيقاف خاطئة — '+cfg.name,'تم إدخال رمز خاطئ',5,['warning']);
+      log('رمز خاطئ');return;
+    }
+  }
+  const was=state;
+  clearTimeout(countdown);state='idle';stopTracking();
+  store.set('wasArmed',false);
+  {const n=NATIVE();if(n)n.stop().catch(()=>{})}
+  stopMotion();stopMic();if(!previewOn)stopCamera();
+  releaseAwake();$('dim').style.display='none';
+  if(was==='armed'){notify('🔓 تم إيقاف النظام — '+cfg.name,new Date().toLocaleTimeString('en-GB'),3,['unlock']);log('تم الإيقاف')}
+  render();
+}
+$('mainBtn').onclick=()=>{state==='idle'?arm():disarm()};
+
+function render(){
+  const b=$('badge'),m=$('mainBtn');
+  b.className='badge';m.className='main';
+  if(state==='idle'){b.classList.add('idle');b.textContent='متوقف';m.textContent='🔒 تفعيل النظام'}
+  else if(state==='arming'){b.classList.add('arming');m.classList.add('wait');m.textContent='إلغاء'}
+  else if(alerts>0){b.classList.add('alert');b.textContent='🚨 تنبيهات: '+alerts;m.classList.add('off');m.textContent='🔓 إيقاف النظام'}
+  else{b.classList.add('armed');b.textContent=theft?'🚨 وضع السرقة':'يعمل ✅';m.classList.add('off');m.textContent='🔓 إيقاف النظام'}
+}
+
+/* ---------- أزرار مساعدة ---------- */
+$('previewBtn').onclick=async()=>{
+  if(state!=='idle')return;
+  if(previewOn){previewOn=false;stopCamera()}else{previewOn=true;await startCamera()}
+};
+$('dimBtn').onclick=()=>{$('dim').style.display='flex'};
+$('dim').onclick=()=>{$('dim').style.display='none'};
+$('tgToken').addEventListener('change',()=>{cfg.tgToken=$('tgToken').value.trim();store.set('tgToken',cfg.tgToken)});
+$('tgChat').addEventListener('change',()=>{cfg.tgChat=$('tgChat').value.trim();store.set('tgChat',cfg.tgChat)});
+$('tgFindBtn').onclick=async()=>{await tgFind();tgPoll()};
+$('remote').addEventListener('change',()=>{if(cfg.remote)tgPoll()});
+$('tgChat').addEventListener('change',()=>{
+  if(cfg.tgChat&&!/^-?\d+$/.test(cfg.tgChat))log('Chat ID يجب أن يكون أرقاماً فقط. امسح الخانة واضغط «جلب Chat ID»');
+  tgPoll();
+});
+function nat(m){return()=>{try{const n=NATIVE();if(n&&n[m])n[m]()}catch(e){log('تتطلب هذه الميزة أحدث نسخة من التطبيق')}}}
+$('homeBtn').onclick=nat('openHome');$('ovBtn').onclick=nat('openOverlay');$('batBtn').onclick=nat('ignoreBattery');
+$('testBtn').onclick=async()=>{
+  const ok=await notify('🔔 اختبار — '+cfg.name,'إذا وصلك هذا فالربط يعمل',4,['bell']);
+  log(ok?'أُرسل الاختبار (ntfy)':'ntfy فشل: '+lastErr+' | online='+navigator.onLine+' | '+location.origin);
+};
+
+/* ---------- حماية من التعطيل ---------- */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){if(state!=='idle')keepAwake()}
+  else if(state==='armed'&&!NATIVE()){notify('⚠️ تحذير — '+cfg.name,'انطفأت الشاشة أو صُغّر التطبيق، قد تتوقف المراقبة',4,['warning'])}
+});
+if(navigator.getBattery){
+  navigator.getBattery().then(bat=>{
+    let low=false;
+    bat.addEventListener('chargingchange',()=>{
+      if(state==='armed'&&!bat.charging){
+        notify('⚠️ فُصل الشاحن — '+cfg.name,'الهاتف يعمل على البطارية',5,['electric_plug']);
+        startTracking();
+      }
+    });
+    bat.addEventListener('levelchange',()=>{
+      if(state==='armed'&&!bat.charging&&bat.level<=0.15&&!low){low=true;notify('🪫 بطارية ضعيفة — '+cfg.name,Math.round(bat.level*100)+'%',4,['battery'])}
+      if(bat.level>0.3)low=false;
+    });
+  }).catch(()=>{});
+}
+window.addEventListener('online',()=>setNet(true));
+window.addEventListener('offline',()=>setNet(false));
+
+loadUI();render();setNet(NATIVE()?true:navigator.onLine);
+
+tgPoll();   /* الاستماع لأوامر تيليغرام إن كان مفعّلاً */
+
+/* تفعيل المراقبة تلقائياً بعد فتح التطبيق */
+if(theft){
+  log('استعادة وضع السرقة');
+  setTimeout(()=>setTheft(true),1500);
+}else if(NATIVE()&&cfg.autoarm){
+  log('تفعيل تلقائي بعد فتح التطبيق');
+  setTimeout(()=>{if(state==='idle')arm(5)},1500);
+}
+</script>
+</body>
+</html>
